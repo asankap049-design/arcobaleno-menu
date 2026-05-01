@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcobaleno Levanzo - Ordine</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #d32f2f; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        input[type="number"], input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
+        .add-btn-container { display: flex; gap: 10px; }
+        button.add-btn { background-color: #0288d1; color: white; border: none; padding: 10px 15px; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        .admin-box { background: #fff3e0; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 2px dashed #ff9800; }
+        button.add-menu-btn { background-color: #ff9800; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; }
+        .menu-list { margin-top: 10px; font-size: 14px; }
+        .menu-list-item { display: flex; justify-content: space-between; background: #ffe0b2; padding: 5px; margin-bottom: 5px; border-radius: 3px; }
+        .del-menu-btn { color: red; cursor: pointer; font-weight: bold; }
+        .order-list-box { background: #e9ecef; padding: 10px; border-radius: 5px; min-height: 50px; margin-bottom: 20px; }
+        .order-item { display: flex; justify-content: space-between; background: white; padding: 8px; margin-bottom: 5px; border-radius: 4px; border-left: 4px solid #4caf50; }
+        .remove-btn { color: red; cursor: pointer; font-weight: bold; }
+        button.submit-btn { width: 100%; background-color: #4caf50; color: white; border: none; padding: 15px; border-radius: 5px; font-size: 18px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Arcobaleno Levanzo</h2>
+        
+        <div class="admin-box">
+            <label>Aggiungi nuovo piatto al menu (කෑම ඇඩ් කිරීම):</label>
+            <div class="add-btn-container">
+                <input type="text" id="newMenuItem" placeholder="Es: Pasta al Pesto">
+                <button type="button" class="add-menu-btn" id="saveMenuBtn">Salva</button>
+            </div>
+            <div class="menu-list" id="savedMenuList"></div>
+        </div>
+
+        <div class="form-group">
+            <label>Nome Cameriere (වේටර්ගේ නම):</label>
+            <input type="text" id="waiterName" placeholder="Es: Mario" required>
+        </div>
+
+        <div class="form-group">
+            <label>Numero del Tavolo (මේස අංකය):</label>
+            <input type="number" id="tableNo" placeholder="Es: 5" required>
+        </div>
+
+        <div class="form-group">
+            <label>Seleziona dal Menu (කෑම තෝරන්න):</label>
+            <div class="add-btn-container">
+                <select id="menuSelect"></select>
+                <button type="button" class="add-btn" onclick="addItemToOrder()">Aggiungi</button>
+            </div>
+        </div>
+
+        <label>Il tuo ordine:</label>
+        <div class="order-list-box" id="orderList"></div>
+        <button type="button" class="submit-btn" id="sendBtn">Invia Ordine</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAU-BBKQTtpJB9_wWjvAXDA1RwIFxy24BI",
+            authDomain: "arcobaleno-c7be3.firebaseapp.com",
+            projectId: "arcobaleno-c7be3",
+            storageBucket: "arcobaleno-c7be3.firebasestorage.app",
+            messagingSenderId: "488963340684",
+            appId: "1:488963340684:web:74d3a0b0d69609fa5e7ea9"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // මෙනුව ලෝඩ් කිරීම (Database එකෙන්)
+        onSnapshot(collection(db, "menuItems"), (snapshot) => {
+            let select = document.getElementById('menuSelect');
+            let savedList = document.getElementById('savedMenuList');
+            select.innerHTML = ""; savedList.innerHTML = "";
+            
+            snapshot.forEach((docSnap) => {
+                let item = docSnap.data().name;
+                let id = docSnap.id;
+                
+                // Dropdown එකට එකතු කිරීම
+                select.innerHTML += `<option value="${item}">${item}</option>`;
+                // මකන්න පුළුවන් ලිස්ට් එකට එකතු කිරීම
+                savedList.innerHTML += `<div class="menu-list-item"><span>${item}</span> <span class="del-menu-btn" onclick="deleteMenuItem('${id}')">X</span></div>`;
+            });
+        });
+
+        // අලුත් කෑමක් Database එකට සේව් කිරීම
+        document.getElementById('saveMenuBtn').addEventListener('click', async () => {
+            let val = document.getElementById('newMenuItem').value.trim();
+            if(val) {
+                await addDoc(collection(db, "menuItems"), { name: val });
+                document.getElementById('newMenuItem').value = "";
+            }
+        });
+
+        window.deleteMenuItem = async function(id) {
+            if(confirm("Vuoi eliminare questo piatto? (කෑම එක මකන්නද?)")) {
+                await deleteDoc(doc(db, "menuItems", id));
+            }
+        }
+
+        let selectedItems = [];
+        window.addItemToOrder = function() {
+            let val = document.getElementById('menuSelect').value;
+            if(val) { selectedItems.push(val); updateOrderListUI(); }
+        }
+        window.removeItem = function(index) {
+            selectedItems.splice(index, 1); updateOrderListUI();
+        }
+        function updateOrderListUI() {
+            let list = document.getElementById('orderList');
+            list.innerHTML = selectedItems.length ? "" : "<span style='color:#777;'>Nessun articolo...</span>";
+            selectedItems.forEach((item, index) => {
+                list.innerHTML += `<div class="order-item"><span>${item}</span><span class="remove-btn" onclick="removeItem(${index})">X</span></div>`;
+            });
+        }
+        updateOrderListUI();
+
+        document.getElementById('sendBtn').addEventListener('click', async () => {
+            let waiter = document.getElementById('waiterName').value;
+            let tableNo = document.getElementById('tableNo').value;
+            
+            if(!waiter || !tableNo || selectedItems.length === 0) {
+                alert("Compila tutti i campi e aggiungi piatti! (සියලු විස්තර පුරවන්න)"); return;
+            }
+
+            document.getElementById('sendBtn').innerText = "Invio...";
+            await addDoc(collection(db, "orders"), {
+                waiter: waiter, table: tableNo, items: selectedItems, timestamp: serverTimestamp(), status: "new"
+            });
+            alert("Ordine inviato! (ඕඩර් එක ගියා!)");
+            window.location.reload(); 
+        });
+    </script>
+</body>
+</html>
