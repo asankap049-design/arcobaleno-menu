@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storico Giornaliero - Arcobaleno</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f0f2f5; }
+        .login-container { max-width: 300px; margin: 100px auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+        #adminContent { display: none; }
+        .day-section { background: white; margin-bottom: 30px; border-radius: 10px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .day-header { background: #d32f2f; color: white; padding: 10px 15px; border-radius: 8px; margin: -15px -15px 15px -15px; font-weight: bold; display: flex; justify-content: space-between; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
+        th { color: #555; text-transform: uppercase; font-size: 12px; }
+        .btn { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .print-btn { background: #333; color: white; margin-bottom: 20px; }
+        .clear-btn { background: #b71c1c; color: white; float: right; }
+        .delete-btn { color: #ff5252; cursor: pointer; font-weight: bold; border: 1px solid #ff5252; padding: 5px 8px; border-radius: 4px; background: transparent; }
+        input[type="password"] { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+
+    <div id="loginBox" class="login-container">
+        <h3>Admin Access</h3>
+        <input type="password" id="passInput" placeholder="Password Admin">
+        <button class="btn print-btn" onclick="checkPass()">Entra</button>
+    </div>
+
+    <div id="adminContent">
+        <div class="no-print">
+            <button class="btn print-btn" onclick="printReport()">🖨️ Stampa Report</button>
+            <button class="btn clear-btn" onclick="clearAllOrders()">Reset Storico</button>
+        </div>
+        
+        <h2 style="text-align: center; color: #333;">Report Vendite Giornaliere</h2>
+        <div id="historyByDate"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, doc, deleteDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAU-BBKQTtpJB9_wWjvAXDA1RwIFxy24BI",
+            authDomain: "arcobaleno-c7be3.firebaseapp.com",
+            projectId: "arcobaleno-c7be3",
+            storageBucket: "arcobaleno-c7be3.firebasestorage.app",
+            messagingSenderId: "488963340684",
+            appId: "1:488963340684:web:74d3a0b0d69609fa5e7ea9"
+        };
+        const db = getFirestore(initializeApp(firebaseConfig));
+
+        // Password Check
+        window.checkPass = function() {
+            if(document.getElementById('passInput').value === "1234") { 
+                document.getElementById('loginBox').style.display = "none";
+                document.getElementById('adminContent').style.display = "block";
+                loadData();
+            } else { alert("Password Errata!"); }
+        }
+
+        // Data Loading & Grouping
+        function loadData() {
+            onSnapshot(query(collection(db, "orders"), orderBy("timestamp", "desc")), (snapshot) => {
+                const grouped = {};
+                
+                snapshot.forEach((docSnap) => {
+                    let order = docSnap.data();
+                    if(order.status === "done" && order.timestamp) {
+                        const date = order.timestamp.toDate().toLocaleDateString('it-IT');
+                        if(!grouped[date]) grouped[date] = [];
+                        grouped[date].push({ id: docSnap.id, ...order });
+                    }
+                });
+
+                let html = "";
+                for (const date in grouped) {
+                    let rows = "";
+                    grouped[date].forEach(order => {
+                        rows += `
+                        <tr>
+                            <td><b>Tavolo ${order.table}</b></td>
+                            <td>${order.waiter || "-"}</td>
+                            <td>${order.items.join(', ')}</td>
+                            <td class="no-print"><button class="delete-btn" onclick="deleteSingleOrder('${order.id}')">X</button></td>
+                        </tr>`;
+                    });
+
+                    html += `
+                    <div class="day-section" id="section-${date.replace(/\//g, '-')}">
+                        <div class="day-header">
+                            <span>📅 Data: ${date}</span>
+                            <span>Totale Ordini: ${grouped[date].length}</span>
+                        </div>
+                        <table>
+                            <thead><tr><th>Tavolo</th><th>Cameriere</th><th>Piatti</th><th class="no-print">Azione</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>`;
+                }
+                document.getElementById('historyByDate').innerHTML = html || "<p style='text-align:center;'>Nessun dato salvato.</p>";
+            });
+        }
+
+        // Delete Single Order
+        window.deleteSingleOrder = async function(id) {
+            if(confirm("Eliminare questo ordine dallo storico?")) await deleteDoc(doc(db, "orders", id));
+        }
+
+        // Clear All Done Orders
+        window.clearAllOrders = async function() {
+            if(confirm("Vuoi cancellare TUTTO lo storico degli ordini completati?")) {
+                const q = query(collection(db, "orders"), where("status", "==", "done"));
+                const querySnapshot = await getDocs(q);
+                querySnapshot.forEach(async (d) => await deleteDoc(doc(db, "orders", d.id)));
+            }
+        }
+
+        // --- New Print Logic ---
+        window.printReport = function() {
+            const printContent = document.getElementById("historyByDate").innerHTML;
+            if(!printContent || printContent.includes("Nessun dato")) {
+                alert("Nulla da stampare!");
+                return;
+            }
+
+            const winPrint = window.open('', '', 'width=900,height=700');
+            winPrint.document.write(`
+                <html>
+                    <head>
+                        <title>Report Vendite Arcobaleno</title>
+                        <style>
+                            body { font-family: sans-serif; padding: 20px; color: #333; }
+                            h2 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                            .day-section { border: 1px solid #ccc; margin-bottom: 30px; padding: 15px; border-radius: 10px; page-break-inside: avoid; }
+                            .day-header { background: #d32f2f; color: white; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; border-radius: 5px; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                            th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; }
+                            th { background: #f9f9f9; font-size: 13px; }
+                            .no-print { display: none !important; }
+                        </style>
+                    </head>
+                    <body>
+                        <h2>Report Vendite Arcobaleno Levanzo</h2>
+                        ${printContent}
+                        <script>
+                            setTimeout(() => { 
+                                window.print(); 
+                                window.close(); 
+                            }, 700);
+                        <\/script>
+                    </body>
+                </html>
+            `);
+            winPrint.document.close();
+        }
+    </script>
+</body>
+</html>
