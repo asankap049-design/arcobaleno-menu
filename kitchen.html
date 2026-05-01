@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcobaleno Levanzo - Cucina</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #212121; /* කුස්සියට ගැලපෙන Dark තේමාවක් */
+            color: white; 
+            padding: 20px; 
+            margin: 0;
+        }
+        h2 { 
+            text-align: center; 
+            color: #ffeb3b; 
+            border-bottom: 2px solid #444;
+            padding-bottom: 10px;
+        }
+        .orders-container { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 20px; 
+            justify-content: center; 
+            margin-top: 20px;
+        }
+        .order-card { 
+            background: white; 
+            color: #333; 
+            padding: 15px; 
+            border-radius: 8px; 
+            width: 300px; 
+            border-top: 5px solid #d32f2f; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3); 
+        }
+        .table-number { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #d32f2f; 
+            margin-bottom: 15px; 
+            border-bottom: 2px solid #eee; 
+            padding-bottom: 10px;
+        }
+        .items-list { 
+            font-size: 18px; 
+            margin-bottom: 20px; 
+            min-height: 80px;
+        }
+        .item { 
+            margin-bottom: 8px; 
+            font-weight: 500; 
+            background: #f1f1f1;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .done-btn { 
+            width: 100%; 
+            background-color: #4caf50; 
+            color: white; 
+            border: none; 
+            padding: 12px; 
+            border-radius: 5px; 
+            font-size: 18px; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+        .done-btn:active { background-color: #388e3c; }
+        .empty-msg {
+            color: #aaa;
+            font-size: 18px;
+            text-align: center;
+            margin-top: 50px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h2>Ordini in Cucina (Live) - Arcobaleno Levanzo</h2>
+    <div class="orders-container" id="ordersDiv">
+        <div class="empty-msg">In attesa di ordini... (ඕඩර්ස් එනකම් බලා සිටී)</div>
+    </div>
+
+    <!-- Firebase සහ Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // ඔයා දීපු Firebase Config එක
+        const firebaseConfig = {
+            apiKey: "AIzaSyAU-BBKQTtpJB9_wWjvAXDA1RwIFxy24BI",
+            authDomain: "arcobaleno-c7be3.firebaseapp.com",
+            projectId: "arcobaleno-c7be3",
+            storageBucket: "arcobaleno-c7be3.firebasestorage.app",
+            messagingSenderId: "488963340684",
+            appId: "1:488963340684:web:74d3a0b0d69609fa5e7ea9"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // කාලය අනුව අලුත් ඕඩර්ස් මුලින් පේන්න හදනවා
+        const q = query(collection(db, "orders"), orderBy("timestamp", "asc"));
+
+        // Live Database එකට කනෙක්ට් වීම
+        onSnapshot(q, (snapshot) => {
+            let ordersDiv = document.getElementById('ordersDiv');
+            let html = "";
+            
+            if (snapshot.empty) {
+                ordersDiv.innerHTML = "<div class='empty-msg'>Nessun ordine al momento. (දැනට ඕඩර්ස් මුකුත් නෑ)</div>";
+                return;
+            }
+
+            snapshot.forEach((doc) => {
+                let order = doc.data();
+                let orderId = doc.id; // ඕඩර් එකේ අයිඩී එක අරගන්නවා මකා දාන්න
+                
+                if(order.items) {
+                    let itemsHtml = order.items.map(item => `<div class="item">✔ ${item}</div>`).join('');
+                    html += `
+                    <div class="order-card">
+                        <div class="table-number">Tavolo: ${order.table}</div>
+                        <div class="items-list">${itemsHtml}</div>
+                        <button class="done-btn" onclick="markAsDone('${orderId}')">Fatto (නිම කළා)</button>
+                    </div>`;
+                }
+            });
+            ordersDiv.innerHTML = html;
+        });
+
+        // "Fatto" බොත්තම එබුවම ඩේටාබේස් එකෙන් ඕඩර් එක මකන ෆන්ක්ෂන් එක
+        window.markAsDone = async function(orderId) {
+            // ඇත්තටම මකන්න ඕනෙද කියලා අහනවා වැරදීමකින් ඔබවුණොත් කියලා
+            if(confirm("Sei sicuro di aver finito questo ordine? (මේ ඕඩර් එක හදලා ඉවරද?)")) {
+                try {
+                    await deleteDoc(doc(db, "orders", orderId));
+                } catch (error) {
+                    alert("Errore: " + error.message);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
