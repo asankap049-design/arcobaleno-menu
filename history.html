@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storico Ordini - Arcobaleno</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        h2 { text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .print-btn { display: block; width: 200px; margin: 0 auto 20px; padding: 10px; background-color: #000; color: #fff; text-align: center; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        
+        /* Print කරද්දි Button එක හැංගෙන්න */
+        @media print { .print-btn { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="print-btn" onclick="window.print()">🖨️ Stampa (Print)</div>
+    <h2>Storico Ordini Completati (ගියපු ඕඩර්ස්)</h2>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Tavolo (මේසය)</th>
+                <th>Cameriere (වේටර්)</th>
+                <th>Piatti (කෑම)</th>
+            </tr>
+        </thead>
+        <tbody id="historyTable"></tbody>
+    </table>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAU-BBKQTtpJB9_wWjvAXDA1RwIFxy24BI",
+            authDomain: "arcobaleno-c7be3.firebaseapp.com",
+            projectId: "arcobaleno-c7be3",
+            storageBucket: "arcobaleno-c7be3.firebasestorage.app",
+            messagingSenderId: "488963340684",
+            appId: "1:488963340684:web:74d3a0b0d69609fa5e7ea9"
+        };
+        const db = getFirestore(initializeApp(firebaseConfig));
+
+        onSnapshot(query(collection(db, "orders"), orderBy("timestamp", "desc")), (snapshot) => {
+            let html = "";
+            snapshot.forEach((docSnap) => {
+                let order = docSnap.data();
+                if(order.status === "done") { // ඉවර කරපු ඕඩර්ස් විතරයි
+                    html += `
+                    <tr>
+                        <td>${order.table}</td>
+                        <td>${order.waiter || "-"}</td>
+                        <td>${order.items.join(', ')}</td>
+                    </tr>`;
+                }
+            });
+            document.getElementById('historyTable').innerHTML = html;
+        });
+    </script>
+</body>
+</html>
